@@ -1,0 +1,133 @@
+High level pseudocode for BP and DFA:
+
+BP:
+1. Initialize weights randomly
+2. Forward pass:
+    - Compute the output of the network
+    - Compute the loss
+3. Backward pass:
+    - Compute the gradient of the weights using delta rule and W^T
+    - Update the weights
+
+DFA:
+1. Initialize weights randomly
+2. Forward pass:
+    - Compute the output of the network
+    - Compute the loss
+3. Backward pass:
+    - Compute the gradient of the weights using delta rule and fixed random B matrix
+
+# ================================================
+# INITIALIZATION
+# ================================================
+Let L = number of hidden layers + 1 output layer
+Let sizes = [d_in, d1, d2, ..., d_{L-1}, d_out]   # e.g. [784, 400, 400, 400, 10]
+
+Initialize forward weights:
+    W[l]  for l = 1 to L        # W[1]: d_in → d1, ..., W[L]: d_{L-1} → d_out
+    (usually Xavier/Glorot uniform)
+
+If using DFA:
+    Initialize fixed random feedback matrices B[l] for l = 1 to L-1
+        B[l] has shape (d_out × d_l)   # direct from output error to layer l
+        (drawn once, e.g. uniform[-0.1, 0.1] or Xavier, never updated!)
+
+Activation f(·) = tanh for hidden layers
+Output activation g(·) = sigmoid
+
+
+
+# Config
+sizes = [784, 512, 512, 10]          # example: 2 hidden layers
+L = len(sizes) - 1
+W = 0.01
+
+# Init
+W = [randn(sizes[l], sizes[l-1]) * sqrt(2/sizes[l-1]) for l in 1:L]
+if DFA: B = [randn(sizes[-1], sizes[l]) for l in 1:L-1]   # fixed!
+
+# Forward
+h = [x]
+a = [None]
+for l in 1:L:
+    a[l] = W[l] @ h[l-1]
+    h[l] = tanh(a[l]) if l < L else sigmoid(a[l])
+
+# Loss & output error
+e = h[L] - y
+
+# Backward
+if BP:
+    delta = e
+    for l in L downto 1:
+        grad_W[l] = delta @ h[l-1].T
+        if l > 1:
+            delta = (W[l].T @ delta) * (1 - h[l-1]²)
+else: # DFA
+    for l in 1:L-1:
+        delta_l = (B[l] @ e) * (1 - h[l]²)
+        grad_W[l] = delta_l @ h[l-1].T
+    grad_W[L] = e @ h[L-1].T
+
+# Update
+W[l] -=  * grad_W[l] for all l
+
+
+
+
+# ================================================
+# FORWARD PASS (same for BP and DFA)
+# ================================================
+Given input x ∈ ℝ^{d_in}
+
+a[0] ← x
+h[0] ← x
+
+for l = 1 to L:
+    a[l] = W[l] @ h[l-1]              # pre-activation
+    if l < L:
+        h[l] = tanh(a[l])             # hidden layer output
+        f_prime[l] = 1 - h[l]²        # store derivative
+    else:
+        y_hat = sigmoid(a[l])         # or softmax / identity
+        # or just keep a[L] as logits if using BCEWithLogitsLoss
+
+# ================================================
+# BACKWARD PASS
+# ================================================
+
+# Output error (same for BP and DFA)
+e = y_hat - y                              # for sigmoid + BCE
+# or e = (y_hat - y) if using MSE or softmax+cross-entropy
+
+# ────────────── BP version ──────────────
+delta = e                                  # delta at layer L (output)
+
+for l = L down to 1:
+    # Gradient for weight W[l]
+    ∇W[l] = delta @ h[l-1].T               # outer product (averaged over batch)
+
+    if l == 1: break                       # no further backprop
+
+    # Propagate error backward through transpose of forward weights
+    delta = (W[l].T @ delta) ⊙ f_prime[l-1]
+
+# ────────────── DFA version ──────────────
+delta_out = e                              # error at output
+
+for l = L-1 down to 1:                     # only hidden layers
+    # Direct random feedback: send output error directly to layer l
+    delta_l = (B[l] @ delta_out) ⊙ f_prime[l]
+
+    # Weight gradient (same as BP)
+    ∇W[l] = delta_l @ h[l-1].T
+
+# Output layer gradient (identical in both)
+∇W[L] = delta_out @ h[L-1].T
+
+# ================================================
+# UPDATE (same for both)
+# ================================================
+for l = 1 to L:
+    W[l] -= η * ∇W[l]        # SGD update (or pass to Adam, etc.)
+
