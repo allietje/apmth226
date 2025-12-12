@@ -60,9 +60,17 @@ def train_one_epoch(net, X, y, batch_size: int, shuffle: bool = True):
 
         batch_loss = net.train_step(x_batch, y_batch)  # torch scalar or float
         if isinstance(batch_loss, torch.Tensor):
+            if not torch.isfinite(batch_loss):
+                print(f"[WARN] Non-finite loss encountered: {batch_loss.item()}. "
+                    f"Stopping epoch early.")
+                return float("nan")
             batch_loss_val = batch_loss.item()
         else:
             batch_loss_val = float(batch_loss)
+            if not np.isfinite(batch_loss_val):
+                print(f"[WARN] Non-finite loss encountered: {batch_loss_val}. "
+                    f"Stopping epoch early.")
+                return float("nan")
 
         total_loss += batch_loss_val * len(x_batch)
 
@@ -154,6 +162,7 @@ def train_bp_dfa(
         ax1.plot(train_err_dfa, label="DFA train error")
         ax1.plot(test_err_dfa, label="DFA test error", linestyle="--")
         ax1.set_xlabel("Epoch")
+        ax1.set_ylim(0, 10)   
         ax1.set_ylabel("Error (%)")
         ax1.set_title("Train & Test Error on MNIST")
         ax1.legend()

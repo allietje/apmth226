@@ -56,15 +56,15 @@ def main():
     # -------------------------
     # Hyperparameters
     # -------------------------
-    run_name       = "IMPLEMENTATION_GPU"   # name prefix for this run in results/
+    run_name       = "stability"   # name prefix for this run in results/
     seed           = 42                     # random seed for reproducibility
     width          = 400                    # hidden layer width of the MLP
     depth          = 3                      # number of hidden layers
-    lr_bp          = 0.001                  # learning rate for BP network
-    lr_dfa         = 0.005                  # learning rate for DFA network
-    batch_size     = 64                     # batch size
+    lr_bp          = 0.0005                  # learning rate for BP network
+    lr_dfa         = 0.001                   # learning rate for DFA network
+    batch_size     = 128                     # batch size
     epochs         = 60                     # number of training epochs
-    feedback_scale = 0.03                   # DFA feedback scale (B matrices)
+    feedback_scale = 0.1                   # DFA feedback scale (B matrices)
     results_dir    = "results"              # root folder for run outputs
 
     # Device choice:

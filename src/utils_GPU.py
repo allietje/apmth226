@@ -46,33 +46,28 @@ def tanh_prime_from_output(h):
     return 1 - h**2
 
 
+EPS = 1e-7  # good for float32
+
 def binary_cross_entropy(y_true, y_pred):
-    """
-    Binary cross-entropy loss between y_true and y_pred.
-
-    Supports:
-      - NumPy arrays: returns a Python float
-      - torch.Tensors: returns a 0-dim torch scalar (tensor)
-
-    For torch, we avoid creating a computation graph (you are doing manual
-    gradients), so it's safe to call inside torch.no_grad().
-    """
     if isinstance(y_pred, torch.Tensor):
-        # Ensure targets are a tensor on the same device
         if not isinstance(y_true, torch.Tensor):
             y_true = torch.as_tensor(
                 y_true, dtype=torch.float32, device=y_pred.device
             )
-        y_pred = torch.clamp(y_pred, 1e-12, 1 - 1e-12)
+
+        y_pred = torch.clamp(y_pred, EPS, 1.0 - EPS)
+
         loss = -(y_true * torch.log(y_pred) +
                  (1 - y_true) * torch.log(1 - y_pred))
         return loss.mean()
 
     # NumPy path
-    y_pred = np.clip(y_pred, 1e-12, 1 - 1e-12)
+    y_pred = np.clip(y_pred, EPS, 1.0 - EPS)
     return float(
-        -np.mean(y_true * np.log(y_pred) +
-                 (1 - y_true) * np.log(1 - y_pred))
+        -np.mean(
+            y_true * np.log(y_pred) +
+            (1 - y_true) * np.log(1 - y_pred)
+        )
     )
 
 

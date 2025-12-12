@@ -194,4 +194,5 @@ class DFANetwork(nn.Module):
             grads_W, grads_b = self.backward(y)
             self.update(grads_W, grads_b)
             loss = binary_cross_entropy(y, y_hat)
+
         return loss
