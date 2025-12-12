@@ -1,5 +1,6 @@
 numpy
 matplotlib
+scikit-learn
 
 # PyTorch packages (torch, torchvision, torchaudio) are installed automatically
 # via setup.sh or setup.py with CUDA support based on your system.

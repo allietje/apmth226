@@ -9,14 +9,14 @@ def main():
     # -------------------------
     # Hyperparameters
     # -------------------------
-    run_name       = "better_run_test"        # name of directory in results that stores this run
+    run_name       = "tSNE_run"        # name of directory in results that stores this run
     seed           = 42                     # random seed for reproducibility
-    width          = 800                    # width of MLP
-    depth          = 2                      # depth of MLP
+    width          = 400                     # width of MLP
+    depth          = 3                      # depth of MLP
     lr_bp          = 0.001                  # learning rate of BP
     lr_dfa         = 0.003                   # learning rate of DFA
-    batch_size     = 128                     # batch size for MNIST/CIFAR
-    epochs         = 60                     # epochs
+    batch_size     = 64                     # batch size for MNIST/CIFAR
+    epochs         = 40                     # epochs
     feedback_scale = 0.03                   # scale of the random matrix B in DFA, lower = more stable but learns slower
     input_dim      = 784                    # 784 for MNIST
     output_dim     = 10                     # 10 for MNIST
