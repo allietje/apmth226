@@ -10,11 +10,13 @@ class DFANetwork:
         self.lr = learning_rate
 
         # Forward weights and biases
-        self.W = []
+        self.W = [np.zeros((layer_sizes[i+1], layer_sizes[i]), dtype=np.float32) for i in range(self.L)]
+        """
         for i in range(self.L):
             fan_in = layer_sizes[i]
             fan_out = layer_sizes[i+1]
             self.W.append(xavier_init(fan_in, fan_out))  # (fan_out, fan_in)
+        """
         self.b = [np.zeros(layer_sizes[i+1]) for i in range(self.L)]  # (fan_out,)
 
         # Feedback matrices B for DFA
