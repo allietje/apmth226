@@ -1,6 +1,6 @@
 # bp.py
 import numpy as np
-from .utils import tanh, tanh_prime_from_output, sigmoid, binary_cross_entropy, xavier_init
+from utils import tanh, tanh_prime_from_output, sigmoid, binary_cross_entropy, xavier_init
 
 class BPNetwork:
     def __init__(self, layer_sizes, learning_rate=0.01, seed=42):
@@ -11,14 +11,21 @@ class BPNetwork:
         self.L = len(layer_sizes) - 1
         self.lr = learning_rate 
 
-        # Forward weights and biases
+        # Forward weights and biases, initiate zeroes
         self.W = []
-        self.b = []
-        for i in range(self.L): # initialization
-            fan_in = layer_sizes[i]
-            fan_out = layer_sizes[i+1]
-            self.W.append(xavier_init(fan_in, fan_out, seed + i if seed else None)) # initialize weights using Xavier
-            self.b.append(np.zeros(fan_out))  # bias initialized to zero
+        for i in range(self.L):
+            fan_in = layer_sizes[i]      # inputs to this layer
+            fan_out = layer_sizes[i+1]   # outputs from this layer (neurons)
+            self.W.append(xavier_init(fan_in, fan_out))  # shape: (fan_out, fan_in)
+        self.b = [np.zeros(layer_sizes[i+1]) for i in range(self.L)]
+        
+        # for RMSprop
+        self.m = [np.zeros_like(W) for W in self.W]  # momentum-like for RMSprop
+        self.v = [np.ones_like(W) * 0.01 for W in self.W]  # variance
+        self.mb = [np.zeros_like(b) for b in self.b]
+        self.vb = [np.ones_like(b) * 0.01 for b in self.b]
+        self.epsilon = 1e-8
+        self.decay = 0.95  # beta1 for RMSprop
 
     def forward(self, x): # forward pass
         """Performs a forward pass through the neural network.
@@ -41,7 +48,7 @@ class BPNetwork:
 
         for l in range(1, self.L + 1): # loops over all hidden layers
             a = self.W[l-1] @ self.h[l-1] + self.b[l-1] # a = Wx + b
-            if l < self.L + 1:  # hidden layers
+            if l < self.L:  # hidden layers
                 h = tanh(a)
             else:               # output layer
                 h = sigmoid(a)
@@ -96,9 +103,13 @@ class BPNetwork:
         return grads_W, grads_b # full list of gradients of weights and biases of each neuron.
 
     def update(self, grads_W, grads_b): # updates the weights and biases using the gradients
-        for l in range(self.L): # loop over all layers
-            self.W[l] -= self.lr * grads_W[l] # lr is learning rate
-            self.b[l] -= self.lr * grads_b[l] # b <- b - \eta * gradient
+        for l in range(self.L):
+            # RMSprop for W
+            self.v[l] = self.decay * self.v[l] + (1 - self.decay) * np.square(grads_W[l])
+            self.W[l] -= self.lr * grads_W[l] / (np.sqrt(self.v[l]) + self.epsilon)
+            # Same for b
+            self.vb[l] = self.decay * self.vb[l] + (1 - self.decay) * np.square(grads_b[l])
+            self.b[l] -= self.lr * grads_b[l] / (np.sqrt(self.vb[l]) + self.epsilon)
 
     def train_step(self, x, y): # one training pass (forward + backward + update)
         y_hat = self.forward(x) # output of forward pass

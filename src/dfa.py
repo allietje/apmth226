@@ -1,6 +1,6 @@
 # dfa.py
 import numpy as np
-from .utils import tanh, tanh_prime_from_output, sigmoid, binary_cross_entropy, xavier_init
+from utils import tanh, tanh_prime_from_output, sigmoid, binary_cross_entropy, xavier_init
 
 class DFANetwork:
     def __init__(self, layer_sizes, learning_rate=0.01, seed=42, feedback_scale=0.1):
@@ -10,21 +10,27 @@ class DFANetwork:
 
         # Forward weights and biases
         self.W = []
-        self.b = []
-        for i in range(self.L): # initilization of random weights using Xavier. Biases are zero at init
-            fan_in = layer_sizes[i]
-            fan_out = layer_sizes[i+1]
-            self.W.append(xavier_init(fan_in, fan_out, seed + i if seed else None))
-            self.b.append(np.zeros(fan_out))
+        for i in range(self.L):
+            fan_in = layer_sizes[i]      # inputs to this layer
+            fan_out = layer_sizes[i+1]   # outputs from this layer (neurons)
+            self.W.append(xavier_init(fan_in, fan_out))  # shape: (fan_out, fan_in)
+        self.b = [np.zeros(layer_sizes[i+1]) for i in range(self.L)]
 
-        # Fixed random feedback matrices: B[l] maps output error → hidden layer l pre-activation
+        # For feedback B (DFA only): uniform scale 1/sqrt(f_out)
         output_dim = layer_sizes[-1]
-        self.B = [] # B_i for the matrix from output to the ith hidden layer
-        np.random.seed(seed + 999)
-        for i in range(1, self.L):  # one per hidden layer
+        self.B = []
+        for i in range(1, self.L):
             hidden_dim = layer_sizes[i]
-            B = np.random.normal(0, feedback_scale, size=(hidden_dim, output_dim)) # feedback_scale controls how strong the Bs are
-            self.B.append(B)
+            scale = feedback_scale / np.sqrt(output_dim)  
+            self.B.append(np.random.uniform(-scale, scale, (hidden_dim, output_dim)))
+            
+        # for RMSprop
+        self.m = [np.zeros_like(W) for W in self.W]  # momentum-like for RMSprop
+        self.v = [np.ones_like(W) * 0.01 for W in self.W]  # variance
+        self.mb = [np.zeros_like(b) for b in self.b]
+        self.vb = [np.ones_like(b) * 0.01 for b in self.b]
+        self.epsilon = 1e-8
+        self.decay = 0.95  # beta1 for RMSprop
 
     def forward(self, x):
         self.h = [x]
@@ -32,7 +38,7 @@ class DFANetwork:
 
         for l in range(1, self.L + 1):
             a = self.W[l-1] @ self.h[l-1] + self.b[l-1] # a = Wx+b
-            if l < self.L + 1:
+            if l < self.L:
                 h = tanh(a)
             else:
                 h = sigmoid(a)
@@ -63,8 +69,12 @@ class DFANetwork:
 
     def update(self, grads_W, grads_b):
         for l in range(self.L):
-            self.W[l] -= self.lr * grads_W[l] # W <- W - (learning rate) * gradient
-            self.b[l] -= self.lr * grads_b[l]
+            # RMSprop for W
+            self.v[l] = self.decay * self.v[l] + (1 - self.decay) * np.square(grads_W[l])
+            self.W[l] -= self.lr * grads_W[l] / (np.sqrt(self.v[l]) + self.epsilon)
+            # Same for b
+            self.vb[l] = self.decay * self.vb[l] + (1 - self.decay) * np.square(grads_b[l])
+            self.b[l] -= self.lr * grads_b[l] / (np.sqrt(self.vb[l]) + self.epsilon)
 
     def train_step(self, x, y): # one iteration (so one forward and one backward pass)
         y_hat = self.forward(x)
