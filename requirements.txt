@@ -1,0 +1,14 @@
+numpy
+
+# PyTorch packages (torch, torchvision, torchaudio) are installed automatically
+# via setup.sh or setup.py with CUDA support based on your system.
+# 
+# To set up automatically:
+#   - Run: bash setup.sh
+#   - Or: python setup.py
+#
+# Manual installation options:
+#   - CUDA 12.1+: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+#   - CUDA 11.8: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+#   - CPU only: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
