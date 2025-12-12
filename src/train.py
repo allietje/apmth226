@@ -63,9 +63,6 @@ def train_bp_dfa(
     test_acc_bp, test_acc_dfa = [], []
 
     for epoch in range(1, epochs + 1):
-        if log_weights and epoch == 1:
-            print("Initial BP W[0] norm:", np.linalg.norm(bp_net.W[0]))
-            print("Initial BP b[0] norm:", np.linalg.norm(bp_net.b[0]))
 
         print(f"\nEpoch {epoch}/{epochs}")
 
@@ -92,12 +89,6 @@ def train_bp_dfa(
         train_acc_dfa.append(acc_train_dfa)
         test_acc_bp.append(acc_test_bp)
         test_acc_dfa.append(acc_test_dfa)
-
-        if log_weights:
-            print(
-                f"After epoch {epoch}: BP W[0] norm = {np.linalg.norm(bp_net.W[0]):.4f}, "
-                f"b[0] norm = {np.linalg.norm(bp_net.b[0]):.4f}"
-            )
 
         print(
             f"BP  → train loss {train_loss_bp:.4f} | "

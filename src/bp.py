@@ -3,8 +3,8 @@ import numpy as np
 from .utils import tanh, tanh_prime_from_output, sigmoid, binary_cross_entropy, xavier_init
 
 class BPNetwork:
-    def __init__(self, layer_sizes, learning_rate=0.01, seed=42):
-        np.random.seed(seed)
+    def __init__(self, layer_sizes, learning_rate=0.01, seed=None):
+
         self.layer_sizes = layer_sizes
         self.L = len(layer_sizes) - 1
         self.lr = learning_rate

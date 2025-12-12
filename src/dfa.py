@@ -3,8 +3,8 @@ import numpy as np
 from .utils import tanh, tanh_prime_from_output, sigmoid, binary_cross_entropy, xavier_init
 
 class DFANetwork:
-    def __init__(self, layer_sizes, learning_rate=0.01, seed=42, feedback_scale=0.1):
-        np.random.seed(seed)
+    def __init__(self, layer_sizes, learning_rate=0.01, seed=None, feedback_scale=0.1):
+
         self.layer_sizes = layer_sizes
         self.L = len(layer_sizes) - 1  # number of weight layers
         self.lr = learning_rate
