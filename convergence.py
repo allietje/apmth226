@@ -56,8 +56,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    widths = [200, 400, 600, 800, 1000]
-    depths = [2, 4, 6, 8, 10, 12, 14]
+    widths = [200, 400, 600, 800, 1000, 1200]
+    depths = [2, 4, 6, 8, 10, 12, 14, 16]
 
     # -------------------------
     # Checkpointing setup (FULL STATE)
