@@ -1,0 +1,25 @@
+{
+  "run_name": "7x240_seed48_stability",
+  "seed": 48,
+  "layer_sizes": [
+    784,
+    240,
+    240,
+    240,
+    240,
+    240,
+    240,
+    240,
+    10
+  ],
+  "width": 240,
+  "depth": 7,
+  "lr_bp": 0.0005,
+  "lr_dfa": 0.001,
+  "batch_size": 256,
+  "epochs": 60,
+  "feedback_scale": 0.1,
+  "input_dim": 784,
+  "output_dim": 10,
+  "device": "cuda"
+}

@@ -1,0 +1,22 @@
+{
+  "run_name": "4x800_seed47_stability",
+  "seed": 47,
+  "layer_sizes": [
+    784,
+    800,
+    800,
+    800,
+    800,
+    10
+  ],
+  "width": 800,
+  "depth": 4,
+  "lr_bp": 0.0005,
+  "lr_dfa": 0.001,
+  "batch_size": 256,
+  "epochs": 60,
+  "feedback_scale": 0.1,
+  "input_dim": 784,
+  "output_dim": 10,
+  "device": "cuda"
+}
