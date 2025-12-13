@@ -15,8 +15,14 @@ This script:
   - runs training via src.experiment.run_bp_dfa_experiment for several architectures
   - saves config, metrics, plots, and final weights under results/
 
+Additionally:
+  - runs each model over multiple random seeds
+  - aggregates mean ± std of final test errors for BP and DFA
+  - saves a CSV summary under results/
 """
 
+import csv
+import statistics
 import torch
 
 from src.utils_GPU import set_seed
@@ -54,6 +60,7 @@ def main():
     # -------------------------
     base_run_name  = "stability"     # base name prefix for runs in results/
     base_seed      = 42              # base random seed for reproducibility
+    num_seeds      = 10              # number of seeds per model
     lr_bp          = 0.0005          # learning rate for BP network
     lr_dfa         = 0.001           # learning rate for DFA network
     batch_size     = 256             # batch size
@@ -72,6 +79,9 @@ def main():
         ("3x800", 3, 800),
         ("4x800", 4, 800),
     ]
+
+    # For CSV summary
+    summary_rows = []
 
     # -------------------------
     # 1. Select device
@@ -101,69 +111,133 @@ def main():
     # -------------------------
     # 4. Loop over model configs
     # -------------------------
-    for idx, (model_name, depth, width) in enumerate(model_configs):
+    for model_idx, (model_name, depth, width) in enumerate(model_configs):
         print(f"\n[implementation_gpu] === Running model {model_name} "
-              f"(depth={depth}, width={width}) ===")
+              f"(depth={depth}, width={width}) over {num_seeds} seeds ===")
 
-        # Per-model seed for reproducibility & diversity
-        cur_seed = base_seed + idx
-        set_seed(cur_seed)
+        bp_final_errors = []
+        dfa_final_errors = []
 
-        # 4a. Build BP and DFA networks on the chosen device
-        bp_net, dfa_net, layer_sizes = create_networks(
-            width=width,
-            depth=depth,
-            lr_bp=lr_bp,
-            lr_dfa=lr_dfa,
-            seed=cur_seed,
-            feedback_scale=feedback_scale,
-            input_dim=input_dim,
-            output_dim=output_dim,
-            device=str(device),    # create_networks expects a device string
-        )
+        # -------------------------
+        # 4a. Loop over seeds for this model
+        # -------------------------
+        for s in range(num_seeds):
+            # Per-seed seed (shared across models is fine; architecture differs)
+            cur_seed = base_seed + s
+            set_seed(cur_seed)
 
-        print(f"[implementation_gpu] Network architecture for {model_name}: {layer_sizes}")
+            print(f"\n[implementation_gpu] --- Seed {cur_seed} for model {model_name} ---")
 
-        # 4b. Pack config for logging
-        run_name = f"{model_name}_{base_run_name}"
-        config = {
-            "run_name": run_name,
-            "seed": cur_seed,
-            "layer_sizes": layer_sizes,
-            "width": width,
+            # Build BP and DFA networks on the chosen device
+            bp_net, dfa_net, layer_sizes = create_networks(
+                width=width,
+                depth=depth,
+                lr_bp=lr_bp,
+                lr_dfa=lr_dfa,
+                seed=cur_seed,
+                feedback_scale=feedback_scale,
+                input_dim=input_dim,
+                output_dim=output_dim,
+                device=str(device),    # create_networks expects a device string
+            )
+
+            print(f"[implementation_gpu] Network architecture for {model_name}: {layer_sizes}")
+
+            # Per-seed run name to avoid collisions
+            run_name = f"{model_name}_seed{cur_seed}_{base_run_name}"
+
+            # Pack config for logging
+            config = {
+                "run_name": run_name,
+                "seed": cur_seed,
+                "layer_sizes": layer_sizes,
+                "width": width,
+                "depth": depth,
+                "lr_bp": lr_bp,
+                "lr_dfa": lr_dfa,
+                "batch_size": batch_size,
+                "epochs": epochs,
+                "feedback_scale": feedback_scale,
+                "input_dim": input_dim,
+                "output_dim": output_dim,
+                "device": str(device),
+            }
+
+            # Run experiment (training + logging + saving)
+            run_dir, metrics = run_bp_dfa_experiment(
+                config,
+                bp_net,
+                dfa_net,
+                X_train,
+                y_train,
+                X_test,
+                y_test,
+                base_dir=results_dir,
+            )
+
+            # Final test errors for this seed
+            final_bp_err = metrics["test_err_bp"][-1]
+            final_dfa_err = metrics["test_err_dfa"][-1]
+            bp_final_errors.append(final_bp_err)
+            dfa_final_errors.append(final_dfa_err)
+
+            print("\n[implementation_gpu] Finished run.")
+            print(f"  Model                : {model_name}")
+            print(f"  Seed                 : {cur_seed}")
+            print(f"  Run directory        : {run_dir}")
+            print(f"  Final BP  test error : {final_bp_err:.2f}%")
+            print(f"  Final DFA test error : {final_dfa_err:.2f}%")
+
+        # -------------------------
+        # 4b. Aggregate over seeds for this model
+        # -------------------------
+        bp_mean = statistics.mean(bp_final_errors)
+        dfa_mean = statistics.mean(dfa_final_errors)
+
+        # Sample standard deviation (ddof=1), appropriate for n=10
+        bp_std = statistics.stdev(bp_final_errors) if len(bp_final_errors) > 1 else 0.0
+        dfa_std = statistics.stdev(dfa_final_errors) if len(dfa_final_errors) > 1 else 0.0
+
+        # Print nice summary for this model
+        print(f"\n[implementation_gpu] === Summary for model {model_name} over {num_seeds} seeds ===")
+        print(f"  BP  final test error : {bp_mean:.2f} ± {bp_std:.2f} %")
+        print(f"  DFA final test error : {dfa_mean:.2f} ± {dfa_std:.2f} %")
+
+        # Store row for CSV
+        summary_rows.append({
+            "model": model_name,
             "depth": depth,
-            "lr_bp": lr_bp,
-            "lr_dfa": lr_dfa,
-            "batch_size": batch_size,
-            "epochs": epochs,
-            "feedback_scale": feedback_scale,
-            "input_dim": input_dim,
-            "output_dim": output_dim,
-            "device": str(device),
-        }
+            "width": width,
+            "n_seeds": num_seeds,
+            "bp_mean": bp_mean,
+            "bp_std": bp_std,
+            "dfa_mean": dfa_mean,
+            "dfa_std": dfa_std,
+        })
 
-        # 4c. Run experiment (training + logging + saving)
-        run_dir, metrics = run_bp_dfa_experiment(
-            config,
-            bp_net,
-            dfa_net,
-            X_train,
-            y_train,
-            X_test,
-            y_test,
-            base_dir=results_dir,
-        )
+    # -------------------------
+    # 5. Save CSV summary
+    # -------------------------
+    csv_path = f"{results_dir}/multi_seed_summary.csv"
+    fieldnames = ["model", "depth", "width", "n_seeds",
+                  "bp_mean", "bp_std", "dfa_mean", "dfa_std"]
 
-        # 4d. Print per-model summary
-        final_bp_err = metrics["test_err_bp"][-1]
-        final_dfa_err = metrics["test_err_dfa"][-1]
-        print("\n[implementation_gpu] Finished run.")
-        print(f"  Model                : {model_name}")
-        print(f"  Run directory        : {run_dir}")
-        print(f"  Final BP  test error : {final_bp_err:.2f}%")
-        print(f"  Final DFA test error : {final_dfa_err:.2f}%")
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(summary_rows)
 
     print("\n[implementation_gpu] All model runs completed.")
+    print(f"[implementation_gpu] Summary CSV saved to: {csv_path}")
+
+    # Also print a compact table-like summary at the end
+    print("\n[implementation_gpu] Final aggregated results (mean ± std, %):")
+    for row in summary_rows:
+        print(
+            f"  {row['model']:>5} | "
+            f"BP  {row['bp_mean']:.2f} ± {row['bp_std']:.2f}   | "
+            f"DFA {row['dfa_mean']:.2f} ± {row['dfa_std']:.2f}"
+        )
 
 
 if __name__ == "__main__":
