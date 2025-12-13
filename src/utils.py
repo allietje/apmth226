@@ -1,5 +1,7 @@
 # utils.py
 import numpy as np
+import random
+import torch
 
 def sigmoid(z): # literally just 1/(1-e^(-z)) aka logistic function
     return 1 / (1 + np.exp(-np.clip(z, -250, 250)))
@@ -18,7 +20,18 @@ def binary_cross_entropy(y_true, y_pred): # our loss function
     return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
 
 def xavier_init(fan_in, fan_out, seed=None): # best random initialization of weights for sigmoid and tanh
-    if seed is not None:
-        np.random.seed(seed)
     limit = np.sqrt(6 / (fan_in + fan_out))
     return np.random.uniform(-limit, limit, (fan_out, fan_in))
+
+def set_seed(seed: int = 0):
+    """
+    Set random seed for reproducibility across:
+      - Python's random
+      - NumPy
+      - PyTorch (CPU and CUDA)
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)

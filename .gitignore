@@ -208,3 +208,9 @@ __marimo__/
 
 # Manual files
 planning.txt
+src/test.py
+src/mnist_train.py
+results
+data/MNIST
+src/test_10class.py
+src/pseudocode.txt

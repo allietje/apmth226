@@ -17,6 +17,12 @@ DFA:
 3. Backward pass:
     - Compute the gradient of the weights using delta rule and fixed random B matrix
 
+
+CRUCIAL DETAILS:
+- Tanh for hidden layers and sigmoid for output layer
+- 
+
+
 # ================================================
 # INITIALIZATION
 # ================================================
