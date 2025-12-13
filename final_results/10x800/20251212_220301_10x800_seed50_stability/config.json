@@ -1,0 +1,28 @@
+{
+  "run_name": "10x800_seed50_stability",
+  "seed": 50,
+  "layer_sizes": [
+    784,
+    800,
+    800,
+    800,
+    800,
+    800,
+    800,
+    800,
+    800,
+    800,
+    800,
+    10
+  ],
+  "width": 800,
+  "depth": 10,
+  "lr_bp": 0.0005,
+  "lr_dfa": 0.001,
+  "batch_size": 256,
+  "epochs": 60,
+  "feedback_scale": 0.1,
+  "input_dim": 784,
+  "output_dim": 10,
+  "device": "cuda"
+}

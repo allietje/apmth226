@@ -59,8 +59,8 @@ def main():
     # Hyperparameters (shared)
     # -------------------------
     base_run_name  = "stability"     # base name prefix for runs in results/
-    base_seed      = 42              # base random seed for reproducibility
-    num_seeds      = 10              # number of seeds per model
+    base_seed      = 51              # base random seed for reproducibility
+    num_seeds      = 1             # number of seeds per model
     lr_bp          = 0.0005          # learning rate for BP network
     lr_dfa         = 0.001           # learning rate for DFA network
     batch_size     = 256             # batch size
@@ -73,11 +73,7 @@ def main():
 
     # Models to reproduce: (name, depth, width)
     model_configs = [
-        ("7x240", 7, 240),
-        ("1x800", 1, 800),
-        ("2x800", 2, 800),
-        ("3x800", 3, 800),
-        ("4x800", 4, 800),
+        ("10x800", 10, 800)
     ]
 
     # For CSV summary
