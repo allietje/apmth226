@@ -62,7 +62,7 @@ def main():
     depth          = 3                      # number of hidden layers
     lr_bp          = 0.0005                  # learning rate for BP network
     lr_dfa         = 0.001                   # learning rate for DFA network
-    batch_size     = 256                    # batch size
+    batch_size     = 128                    # batch size
     epochs         = 60                     # number of training epochs
     feedback_scale = 0.1                   # DFA feedback scale (B matrices)
     results_dir    = "results"              # root folder for run outputs
