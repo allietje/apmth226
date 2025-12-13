@@ -1,35 +1,32 @@
-# convergence.py
+# convergence.py    
 """
 convergence.py
 Runs a grid search over widths and depths for BP vs DFA on MNIST.
 Trains until convergence (or max 300 epochs), computes convergence epoch,
 saves per-run CSV + final aggregated summary, and plots depth vs convergence
 for each width.
+Now with checkpointing: safe against 6-hour job timeouts.
 """
-
 import csv
 import statistics
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import pickle  # for saving completed set
+
 from src.utils_GPU import set_seed
 from data.data import load_mnist
 from src.model_GPU import create_networks
-from src.experiment_GPU import run_bp_dfa_experiment_until_convergence  # ← you'll need this new function
+from src.experiment_GPU import run_bp_dfa_experiment_until_convergence
 
 # ------------------------------------------------------------------
 # Convergence detection
 # ------------------------------------------------------------------
 def moving_average(arr, window=5):
-    """Simple moving average (valid mode)"""
     return np.convolve(arr, np.ones(window) / window, mode='valid')
 
 def check_convergence(test_errors, window=5, epsilon=0.1):
-    """
-    Returns True if the last 5-epoch moving average changed by < epsilon
-    compared to the previous 5-epoch window.
-    """
     if len(test_errors) < 2 * window:
         return False
     ma = moving_average(test_errors, window)
@@ -48,9 +45,9 @@ def main():
     lr_bp = 0.0005
     lr_dfa = 0.001
     batch_size = 256
-    max_epochs = 300                # safety upper bound
+    max_epochs = 300
     convergence_window = 5
-    convergence_epsilon = 0.1        # test error % change
+    convergence_epsilon = 0.1
     feedback_scale = 0.1
     results_dir = "results"
     os.makedirs(results_dir, exist_ok=True)
@@ -59,8 +56,29 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    widths = [200, 400, 600, 800, 1000, 1200]
-    depths = [2, 4, 6, 8, 10, 12, 14, 16]
+    widths = [200, 400, 600, 800, 1000]
+    depths = [2, 4, 6, 8, 10, 12, 14]
+
+    # -------------------------
+    # Checkpointing setup (FULL STATE)
+    # -------------------------
+    checkpoint_file = os.path.join(results_dir, "convergence_checkpoint.pkl")
+    state = {
+        'completed_models': set(),
+        'summary_rows': [],
+        'plot_data': {w: {'depths': [], 'bp': [], 'bp_std': [], 'dfa': [], 'dfa_std': []} for w in widths}
+    }
+
+    if os.path.exists(checkpoint_file):
+        with open(checkpoint_file, "rb") as f:
+            state = pickle.load(f)
+        print(f"Resuming from checkpoint: {len(state['completed_models'])} models completed.")
+    else:
+        print("No checkpoint found — starting fresh.")
+
+    completed_models = state['completed_models']
+    summary_rows = state['summary_rows']
+    plot_data = state['plot_data']
 
     # Data loading (once)
     set_seed(base_seed)
@@ -68,7 +86,7 @@ def main():
     input_dim = X_train.shape[1]
     output_dim = y_train.shape[1]
 
-    # Containers for final summary and plots
+    # Containers
     summary_rows = []
     plot_data = {w: {'depths': [], 'bp': [], 'bp_std': [], 'dfa': [], 'dfa_std': []} for w in widths}
 
@@ -79,7 +97,13 @@ def main():
         for depth in depths:
             model_name = f"{depth}x{width}"
             model_counter += 1
-            print(f"\n=== [{model_counter}/{total_models}] Model {model_name} ===")
+
+            # Skip if already completed
+            if model_name in completed_models:
+                print(f"\n=== [{model_counter}/{total_models}] Skipping completed model {model_name} ===")
+                continue
+
+            print(f"\n=== [{model_counter}/{total_models}] Running model {model_name} ===")
 
             bp_conv_epochs = []
             dfa_conv_epochs = []
@@ -87,7 +111,7 @@ def main():
             dfa_final_err = []
 
             for s in range(num_seeds):
-                seed = base_seed + s # keep seeds equal for all models for fair comparison
+                seed = base_seed + s  # same seeds across models
                 set_seed(seed)
                 print(f"--- Seed {seed} ---")
 
@@ -107,7 +131,6 @@ def main():
                     "device": str(device),
                 }
 
-                # ← NEW: train until convergence
                 run_dir, metrics, actual_epochs = run_bp_dfa_experiment_until_convergence(
                     config=config,
                     bp_net=bp_net, dfa_net=dfa_net,
@@ -119,7 +142,7 @@ def main():
                     max_epochs=max_epochs
                 )
 
-                # Save per-run detailed CSV
+                # Per-run CSV
                 per_run_csv = os.path.join(run_dir, "epoch_metrics.csv")
                 with open(per_run_csv, "w", newline="") as f:
                     writer = csv.writer(f)
@@ -134,17 +157,15 @@ def main():
                             metrics["train_losses_dfa"][e]
                         ])
 
-                # Convergence epochs (if never converged → actual_epochs)
+                # Convergence detection
                 bp_conv = actual_epochs
                 dfa_conv = actual_epochs
                 for e in range(convergence_window * 2, actual_epochs):
-                    recent_err = metrics["test_err_bp"][:e+1]
-                    if check_convergence(recent_err, convergence_window, convergence_epsilon):
+                    if check_convergence(metrics["test_err_bp"][:e+1], convergence_window, convergence_epsilon):
                         bp_conv = e + 1
                         break
                 for e in range(convergence_window * 2, actual_epochs):
-                    recent_err = metrics["test_err_dfa"][:e+1]
-                    if check_convergence(recent_err, convergence_window, convergence_epsilon):
+                    if check_convergence(metrics["test_err_dfa"][:e+1], convergence_window, convergence_epsilon):
                         dfa_conv = e + 1
                         break
 
@@ -156,17 +177,16 @@ def main():
                 print(f"BP converged at epoch {bp_conv} | final err {metrics['test_err_bp'][-1]:.2f}%")
                 print(f"DFA converged at epoch {dfa_conv} | final err {metrics['test_err_dfa'][-1]:.2f}%")
 
-            # Aggregate over seeds
+            # Aggregate
             bp_mean_conv = statistics.mean(bp_conv_epochs)
             dfa_mean_conv = statistics.mean(dfa_conv_epochs)
             bp_std_conv = statistics.stdev(bp_conv_epochs) if num_seeds > 1 else 0.0
             dfa_std_conv = statistics.stdev(dfa_conv_epochs) if num_seeds > 1 else 0.0
 
             print(f"\nSummary {model_name}:")
-            print(f"  BP  conv epoch: {bp_mean_conv:.1f} ± {bp_std_conv:.1f}")
-            print(f"  DFA conv epoch: {dfa_mean_conv:.1f} ± {dfa_std_conv:.1f}")
+            print(f" BP conv epoch: {bp_mean_conv:.1f} ± {bp_std_conv:.1f}")
+            print(f" DFA conv epoch: {dfa_mean_conv:.1f} ± {dfa_std_conv:.1f}")
 
-            # Store for big CSV
             summary_rows.append({
                 "model": model_name,
                 "depth": depth,
@@ -180,15 +200,22 @@ def main():
                 "dfa_final_err_mean": statistics.mean(dfa_final_err),
             })
 
-            # Store for plotting
             plot_data[width]['depths'].append(depth)
             plot_data[width]['bp'].append(bp_mean_conv)
             plot_data[width]['bp_std'].append(bp_std_conv)
             plot_data[width]['dfa'].append(dfa_mean_conv)
             plot_data[width]['dfa_std'].append(dfa_std_conv)
 
+            # === Save full checkpoint after each model ===
+            state['completed_models'].add(model_name)
+            state['summary_rows'] = summary_rows
+            state['plot_data'] = plot_data
+            with open(checkpoint_file, "wb") as f:
+                pickle.dump(state, f)
+            print(f"Checkpoint updated: {len(state['completed_models'])} models completed.")
+
     # -------------------------
-    # Save final aggregated CSV
+    # Save final CSV and plots (same as before)
     # -------------------------
     big_csv = os.path.join(results_dir, "convergence_grid_summary.csv")
     with open(big_csv, "w", newline="") as f:
@@ -200,6 +227,7 @@ def main():
         writer.writeheader()
         writer.writerows(summary_rows)
     print(f"\nFinal summary saved to {big_csv}")
+
 
     # -------------------------
     # Plot: depth vs convergence epoch for each width
@@ -275,6 +303,9 @@ def main():
         plt.savefig(plot_path_width, dpi=200)
         plt.close()
         print(f"Plot saved: {plot_path_width}")
+
+
+    print("\nAll done! Full grid search completed safely.")
 
 if __name__ == "__main__":
     main()
