@@ -2,14 +2,20 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+from plotting_style import apply_style, get_bp_dfa_colors, save_plot, set_log_scale
 
-def plot_bp_vs_dfa_error_by_width(csv_path, save_path=None):
+# Apply consistent styling
+apply_style()
+
+def plot_bp_vs_dfa_error_by_width(csv_path, save_path=None, subdir='convergence'):
     """
     Plot BP vs DFA final error % holding width constant.
     
     Args:
         csv_path: Path to convergence_grid_summary.csv
         save_path: Optional path to save the plot
+        subdir: Subdirectory for saving plots
     """
     # Read the CSV data
     df = pd.read_csv(csv_path)
@@ -28,6 +34,8 @@ def plot_bp_vs_dfa_error_by_width(csv_path, save_path=None):
     else:
         axes = axes.flatten()
     
+    colors = get_bp_dfa_colors()
+    
     for i, width in enumerate(widths):
         ax = axes[i]
         
@@ -36,16 +44,15 @@ def plot_bp_vs_dfa_error_by_width(csv_path, save_path=None):
         
         # Plot BP and DFA error rates
         ax.plot(width_data['depth'], width_data['bp_final_err_mean'], 
-                'o-', label='BP', color='blue', linewidth=2, markersize=6)
+                'o-', label='BP', color=colors['bp'], markersize=6)
         ax.plot(width_data['depth'], width_data['dfa_final_err_mean'], 
-                's-', label='DFA', color='red', linewidth=2, markersize=6)
+                's-', label='DFA', color=colors['dfa'], markersize=6)
         
         # Formatting
         ax.set_xlabel('Depth')
         ax.set_ylabel('Final Error (%)')
         ax.set_title(f'Width = {width}')
         ax.legend()
-        ax.grid(True, alpha=0.3)
         
         # Set reasonable y-axis limits
         max_error = max(width_data['bp_final_err_mean'].max(), 
@@ -58,10 +65,10 @@ def plot_bp_vs_dfa_error_by_width(csv_path, save_path=None):
     
     plt.tight_layout()
     if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        save_plot(fig, save_path, subdir=subdir)
     plt.show()
 
-def plot_bp_vs_dfa_error_single_width(csv_path, width, save_path=None):
+def plot_bp_vs_dfa_error_single_width(csv_path, width, save_path=None, subdir='convergence'):
     """
     Plot BP vs DFA final error % for a single width.
     
@@ -69,6 +76,7 @@ def plot_bp_vs_dfa_error_single_width(csv_path, width, save_path=None):
         csv_path: Path to convergence_grid_summary.csv
         width: Specific width to plot
         save_path: Optional path to save the plot
+        subdir: Subdirectory for saving plots
     """
     # Read the CSV data
     df = pd.read_csv(csv_path)
@@ -81,38 +89,36 @@ def plot_bp_vs_dfa_error_single_width(csv_path, width, save_path=None):
         return
     
     # Create the plot
-    plt.figure(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(6, 4))
     
-    plt.plot(width_data['depth'], width_data['bp_final_err_mean'], 
-             'o-', label='BP', color='blue', linewidth=3, markersize=8)
-    plt.plot(width_data['depth'], width_data['dfa_final_err_mean'], 
-             's-', label='DFA', color='red', linewidth=3, markersize=8)
+    colors = get_bp_dfa_colors()
     
-    # Add error bars if available (using std deviation as approximation)
-    # Note: CSV has bp_conv_std and dfa_conv_std, but we could add final error std if available
+    ax.plot(width_data['depth'], width_data['bp_final_err_mean'], 
+             'o-', label='BP', color=colors['bp'], markersize=6)
+    ax.plot(width_data['depth'], width_data['dfa_final_err_mean'], 
+             's-', label='DFA', color=colors['dfa'], markersize=6)
     
-    plt.xlabel('Network Depth', fontsize=12)
-    plt.ylabel('Final Test Error (%)', fontsize=12)
-    plt.title(f'BP vs DFA Final Error (Width = {width})', fontsize=14)
-    plt.legend(fontsize=12)
-    plt.grid(True, alpha=0.3)
+    ax.set_xlabel('Network Depth')
+    ax.set_ylabel('Final Test Error (%)')
+    ax.set_title(f'BP vs DFA Final Error (Width = {width})')
+    ax.legend()
     
     # Set reasonable y-axis limits
     max_error = max(width_data['bp_final_err_mean'].max(), 
                    width_data['dfa_final_err_mean'].max())
-    plt.ylim(0, min(max_error * 1.2, 100))
+    ax.set_ylim(0, min(max_error * 1.2, 100))
     
     plt.tight_layout()
     if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        save_plot(fig, save_path, subdir=subdir)
     plt.show()
 
 # Example usage:
 if __name__ == "__main__":
-    csv_path = "/orcd/data/zhang_f/001/azong/projects/DFA/apmth226_gpu/final_results/convergence/convergence_grid_summary.csv"
+    csv_path = "../figures/convergence/convergence_grid_summary.csv"
     
     # Plot all widths in a grid
-    plot_bp_vs_dfa_error_by_width(csv_path, "results/bp_vs_dfa_all_widths.png")
+    plot_bp_vs_dfa_error_by_width(csv_path, "bp_vs_dfa_all_widths")
     
     # Plot a specific width
-    plot_bp_vs_dfa_error_single_width(csv_path, 800, "results/bp_vs_dfa_width_800.png")
+    # plot_bp_vs_dfa_error_single_width(csv_path, 800, "bp_vs_dfa_width_800")
